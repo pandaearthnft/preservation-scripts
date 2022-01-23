@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+
+require "down"
+require "pry"
+require "json"
+
+File.open("./metadata.ndjson").each_line.map do |l|
+  line = JSON.parse(l, object_class: OpenStruct)
+  next unless line.image_original_url.to_s.include?(".svg")
+
+  line.image_original_url.split("/")[-1].gsub(".svg", "").then do |id|
+    p id
+    Down.download(line.image_original_url, destination: "svgs/#{id}.svg")
+  end
+end

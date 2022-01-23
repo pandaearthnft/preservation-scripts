@@ -1,0 +1,99 @@
+#!/usr/bin/env ruby
+
+require "json"
+require "nokogiri"
+require "pry"
+require 'net/http'
+
+def format_int(value, type)
+  return value unless %w(gen purity).include?(type)
+  value.to_i
+end
+
+trait_hsh = {}
+all_traits = [
+  "Body",
+  "Clothes",
+  "Doll",
+  "Ear",
+  "Eye Ball",
+  "Eye Rim",
+  "Gender",
+  "Generation",
+  "Hair",
+  "Hair Decor",
+  "Head",
+  "Nose Mouth",
+  "Purity",
+  "Type"
+]
+
+TRAIT_DICT = {
+  "gen" => "Generation",
+  "gender" => "Gender",
+  "purity" => "Purity",
+  "type" => "Type",
+}
+
+File.open('./metadata.ndjson').each_line.map do |l|
+  line = JSON.parse(l, object_class: OpenStruct)
+  next if line.image_original_url.nil?
+  arr = []
+
+  line.traits.each do |hsh|
+    arr << { trait_type: TRAIT_DICT[hsh.trait_type], value: format_int(hsh.value, hsh.trait_type) }
+  end
+
+  if File.extname(line.image_original_url.to_s) == ".svg"
+    Nokogiri::XML(open("./svgs/#{line.token_id}.svg")).elements[0].elements.each do |ele|
+      type = ele.attributes.values[0].value.split(/ |\_/).map(&:capitalize).join(" ")
+
+      trait_hsh[type] ||= {}
+      md = ele.children.to_s
+
+      value = if !!trait_hsh[type][md]
+        trait_hsh[type][md]
+      else
+        trait_hsh[type][md] = trait_hsh[type].size + 1
+      end
+      # binding.pry if type == "Hair" && trait_hsh["Hair"][md] == 2
+      arr << { trait_type: type, value: value }
+    end
+  else
+    fancyType = arr.select { |x| x[:trait_type] == "Type" }[0][:value]
+
+    (all_traits - TRAIT_DICT.values).each do |trait|
+      trait_hsh[trait] ||= {}
+
+      value = if trait_hsh[trait][fancyType]
+        trait_hsh[trait][fancyType]
+      else
+        trait_hsh[trait][fancyType] = trait_hsh[trait].size + 1
+      end
+      arr << { trait_type: trait, value: value }
+    end
+  end
+
+  # Setting a default value of 0 if the trait
+  # doesn't exist for a given panda
+  if arr.length != 14
+    (all_traits - arr.map { |x| x[:trait_type] }).each do |trait|
+      arr << { trait_type: trait, value: 0 }
+    end
+  end
+
+  hsh = {
+    description: "This Panda was wrapped using the Wrapped Panda contract, accessible from https://wrappedpandas.com",
+    name: "Wrapped Panda ##{line.token_id}",
+    image: "https://pandapandas.s3.us-west-2.amazonaws.com/images/#{line.token_id}.png",
+    external_url: "https://wrappedpandas.com",
+    attributes: arr,
+    id: line.token_id.to_i
+  }
+
+  open('rarity.ndjson', 'a') do |f|
+    p hsh
+    f << JSON.dump(hsh)
+    f << "\n"
+  end
+end

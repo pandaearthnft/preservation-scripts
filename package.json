@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "axios": "^0.25.0",
+    "ndjson": "^2.0.0",
+    "sharp": "^0.29.3"
+  }
+}

@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+
+require "json"
+require "pry"
+
+set = Set.new
+
+File.open('./rarity.ndjson').each_line.map do |l|
+  line = JSON.parse(l)
+  line["attributes"].each { |x| set << x }
+end
+
+hsh = {}
+set.map { |x| x["trait_type"] }.uniq.each do |a|
+  hsh[a] = set.select { |x| x["trait_type"] == a }.map { |x| x["value"] }
+end
+
+p hsh.map { |k,v| [k, v.size] }

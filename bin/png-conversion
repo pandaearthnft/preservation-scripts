@@ -1,0 +1,26 @@
+#!/usr/bin/env node
+
+const sharp = require('sharp')
+const axios = require('axios').default;
+const ndjson = require('ndjson');
+const fs = require('fs');
+
+const contractString = '0x663e4229142a27f00bafb5d087e1e730648314c3/';
+
+fs.createReadStream('os-formatted.ndjson')
+  .pipe(ndjson.parse())
+  .on('data', function(obj) {
+    if (obj.image){
+      let id = obj.image.split(contractString)[1].replace(/.png|.svg/g, '')
+      if (!fs.existsSync(`images/${id}.png`)) {
+        console.log(id)
+        output(obj.image, id)
+      }
+    }
+  })
+
+const output = async (url, tokenId) => {
+  const input = await axios({ url: url, responseType: 'arraybuffer' });
+  console.log(input.data)
+  await sharp(input.data, {density: 450}).png({quality: 100}).toFile(`images/${tokenId}.png`);
+};

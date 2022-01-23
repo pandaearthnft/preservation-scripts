@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+
+require "json"
+require "pry"
+
+a = []
+File.open('./os-metadata.ndjson').each_line.map do |l|
+  line = JSON.parse(l)
+  a << line["token_id"] if line["image_url"].nil? || line["image_url"] == ""
+end
+p a

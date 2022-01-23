@@ -1,0 +1,7 @@
+formatted.ndjson
+rarity.ndjson
+images/
+svgs/
+rarity.json
+node_modules/
+.env

@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+
+require "pry"
+require "faraday"
+require "json"
+
+@offset = 0
+
+def call
+  url = "https://api.opensea.io/api/v1/assets"
+  binding.pry
+  response = Faraday.get(url, {offset: @offset, order_direction: :asc, limit: 50, collection: "pandaearth", asset_contract_address: "0x663e4229142a27f00bafb5d087e1e730648314c3"}, {'Accept' => 'application/json', "X-API-KEY" => ENV["API_KEY"]})
+  save(JSON.parse(response.body, symbolize_names: true))
+end
+
+def save(parsed)
+  parsed[:assets].each do |asset|
+    open('os-metadata.ndjson', 'a') do |f|
+      f << JSON.dump(asset)
+      f << "\n"
+    end
+  end
+  recall(parsed[:assets].map { |x| x[:token_id] }.uniq.last.to_i) if parsed[:assets].length > 0
+end
+
+def recall(int)
+  @offset = int
+  p @offset
+  call
+end
+
+call
