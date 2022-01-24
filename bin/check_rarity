@@ -2,10 +2,11 @@
 
 require "json"
 require "pry"
+require "set"
 
 set = Set.new
 
-File.open('./rarity.ndjson').each_line.map do |l|
+File.open('./final.ndjson').each_line.map do |l|
   line = JSON.parse(l)
   line["attributes"].each { |x| set << x }
 end

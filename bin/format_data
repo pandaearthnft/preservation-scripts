@@ -11,7 +11,7 @@ def format_int(value, type)
 end
 
 trait_hsh = {}
-all_traits = [
+ALL_TRAITS = [
   "Body",
   "Clothes",
   "Doll",
@@ -35,10 +35,16 @@ TRAIT_DICT = {
   "type" => "Type",
 }
 
-File.open('./metadata.ndjson').each_line.map do |l|
+File.open('./os-metadata.ndjson').each_line.map do |l|
   line = JSON.parse(l, object_class: OpenStruct)
   next if line.image_original_url.nil?
   arr = []
+
+  # Setting nulls/undefined to 0
+  ALL_TRAITS.each do |trait|
+    trait_hsh[trait] ||= {}
+    trait_hsh[trait][""] = 0
+  end
 
   line.traits.each do |hsh|
     arr << { trait_type: TRAIT_DICT[hsh.trait_type], value: format_int(hsh.value, hsh.trait_type) }
@@ -54,21 +60,18 @@ File.open('./metadata.ndjson').each_line.map do |l|
       value = if !!trait_hsh[type][md]
         trait_hsh[type][md]
       else
-        trait_hsh[type][md] = trait_hsh[type].size + 1
+        trait_hsh[type][md] = trait_hsh[type].size
       end
-      # binding.pry if type == "Hair" && trait_hsh["Hair"][md] == 2
       arr << { trait_type: type, value: value }
     end
   else
     fancyType = arr.select { |x| x[:trait_type] == "Type" }[0][:value]
 
-    (all_traits - TRAIT_DICT.values).each do |trait|
-      trait_hsh[trait] ||= {}
-
+    (ALL_TRAITS - TRAIT_DICT.values).each do |trait|
       value = if trait_hsh[trait][fancyType]
         trait_hsh[trait][fancyType]
       else
-        trait_hsh[trait][fancyType] = trait_hsh[trait].size + 1
+        trait_hsh[trait][fancyType] = trait_hsh[trait].size
       end
       arr << { trait_type: trait, value: value }
     end
@@ -77,7 +80,7 @@ File.open('./metadata.ndjson').each_line.map do |l|
   # Setting a default value of 0 if the trait
   # doesn't exist for a given panda
   if arr.length != 14
-    (all_traits - arr.map { |x| x[:trait_type] }).each do |trait|
+    (ALL_TRAITS - arr.map { |x| x[:trait_type] }).each do |trait|
       arr << { trait_type: trait, value: 0 }
     end
   end
@@ -91,7 +94,7 @@ File.open('./metadata.ndjson').each_line.map do |l|
     id: line.token_id.to_i
   }
 
-  open('rarity.ndjson', 'a') do |f|
+  open('final.ndjson', 'a') do |f|
     p hsh
     f << JSON.dump(hsh)
     f << "\n"

@@ -1,0 +1,49 @@
+#!/usr/bin/env ruby
+
+require "set"
+require "pry"
+require "json"
+require "csv"
+
+ALL_TRAITS = [
+  "Body",
+  "Clothes",
+  "Doll",
+  "Ear",
+  "Eye Ball",
+  "Eye Rim",
+  "Gender",
+  "Generation",
+  "Hair",
+  "Hair Decor",
+  "Head",
+  "Nose Mouth",
+  "Purity",
+  "Type"
+]
+
+ALL_TRAITS.each do |trait|
+  trait_ints = Set.new
+  examples = {}
+
+  File.open("./final.ndjson").each_line.map do |l|
+    line = JSON.parse(l, object_class: OpenStruct)
+    next unless line.attributes.find { |x| x.trait_type == "Type" }.value == "normal"
+
+    int = line.attributes.find { |x| x.trait_type == trait }.value
+    trait_ints << int
+
+    examples[trait] = {} if !examples[trait]
+    examples[trait][int] = [] if !examples[trait][int]
+    examples[trait][int] << line.image
+  end
+
+  CSV.open("csvs/#{trait}.csv", "wb") do |csv|
+    csv << ["Trait Number", "Human Readable Name", "Example Panda", "Example Panda", "Example Panda"]
+
+    trait_ints.each do |int|
+      csv << [int, "", "=HYPERLINK(\"#{examples[trait][int][0]}\", \"#{examples[trait][int][0]}\")", "=HYPERLINK(\"#{examples[trait][int][1]}\", \"#{examples[trait][int][1]}\")", "=HYPERLINK(\"#{examples[trait][int][2]}\", \"#{examples[trait][int][2]}\")"]
+    end
+  end
+end
+
