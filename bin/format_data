@@ -3,7 +3,8 @@
 require "json"
 require "nokogiri"
 require "pry"
-require 'net/http'
+require "net/http"
+require "csv"
 
 def format_int(value, type)
   return value unless %w(gen purity).include?(type)
@@ -11,28 +12,37 @@ def format_int(value, type)
 end
 
 trait_hsh = {}
-ALL_TRAITS = [
-  "Body",
-  "Clothes",
-  "Doll",
-  "Ear",
-  "Eye Ball",
-  "Eye Rim",
-  "Gender",
-  "Generation",
-  "Hair",
-  "Hair Decor",
-  "Head",
-  "Nose Mouth",
-  "Purity",
-  "Type"
-]
 
 TRAIT_DICT = {
   "gen" => "Generation",
   "gender" => "Gender",
   "purity" => "Purity",
   "type" => "Type",
+  "body" => "Stance",
+  "hair_decor" => "Headwear",
+  "doll" => "Hand Item",
+  "clothes" => "Clothes"
+}
+
+FANCIES = {
+  "skeleton" => {
+    "Headwear" => "None",
+    "Hand Item" => "Fire Ball",
+    "Clothes" => "Red Cape",
+    "Stance" => "Standing",
+  },
+  "robot" => {
+    "Headwear" => "Robot Helmet",
+    "Hand Item" => "Nothing",
+    "Clothes" => "Robot Suit",
+    "Stance" => "Standing",
+  },
+  "bride" => {
+    "Headwear" => "Bridal Hat",
+    "Hand Item" => "Nothing",
+    "Clothes" => "Bridal Dress",
+    "Stance" => "Standing",
+  }
 }
 
 File.open('./os-metadata.ndjson').each_line.map do |l|
@@ -41,18 +51,19 @@ File.open('./os-metadata.ndjson').each_line.map do |l|
   arr = []
 
   # Setting nulls/undefined to 0
-  ALL_TRAITS.each do |trait|
+  TRAIT_DICT.values.each do |trait|
     trait_hsh[trait] ||= {}
     trait_hsh[trait][""] = 0
   end
 
   line.traits.each do |hsh|
-    arr << { trait_type: TRAIT_DICT[hsh.trait_type], value: format_int(hsh.value, hsh.trait_type) }
+    arr << { trait_type: TRAIT_DICT[hsh.trait_type.downcase], value: format_int(hsh.value, hsh.trait_type) }
   end
 
   if File.extname(line.image_original_url.to_s) == ".svg"
     Nokogiri::XML(open("./svgs/#{line.token_id}.svg")).elements[0].elements.each do |ele|
-      type = ele.attributes.values[0].value.split(/ |\_/).map(&:capitalize).join(" ")
+      type = TRAIT_DICT[ele.attributes.values[0].value.downcase]
+      next if type.nil?
 
       trait_hsh[type] ||= {}
       md = ele.children.to_s
@@ -62,32 +73,44 @@ File.open('./os-metadata.ndjson').each_line.map do |l|
       else
         trait_hsh[type][md] = trait_hsh[type].size
       end
+
+      if File.exist?("csvs/#{type}.csv")
+        value = CSV.read("csvs/#{type}.csv", headers: true).find { |x| x["Trait Number"] == value.to_s }["Human Readable Name"]
+      end
+
       arr << { trait_type: type, value: value }
     end
   else
-    fancyType = arr.select { |x| x[:trait_type] == "Type" }[0][:value]
+    fancy_type = arr.select { |x| x[:trait_type] == "Type" }[0][:value]
 
-    (ALL_TRAITS - TRAIT_DICT.values).each do |trait|
-      value = if trait_hsh[trait][fancyType]
-        trait_hsh[trait][fancyType]
+    (TRAIT_DICT.values - %w(Gender Generation Purity Type)).each do |trait|
+      value = if %w(Hand\ Item Headwear Clothes Stance).include?(trait)
+        if trait_hsh[trait][fancy_type]
+          trait_hsh[trait][fancy_type]
+        else
+          trait_hsh[trait][fancy_type] = trait_hsh[trait].size
+        end
+        FANCIES.fetch(fancy_type, {}).fetch(trait, "guardian")
       else
-        trait_hsh[trait][fancyType] = trait_hsh[trait].size
+        if trait_hsh[trait][fancy_type]
+          trait_hsh[trait][fancy_type]
+        else
+          trait_hsh[trait][fancy_type] = trait_hsh[trait].size
+        end
       end
       arr << { trait_type: trait, value: value }
     end
   end
 
-  # Setting a default value of 0 if the trait
-  # doesn't exist for a given panda
-  if arr.length != 14
-    (ALL_TRAITS - arr.map { |x| x[:trait_type] }).each do |trait|
-      arr << { trait_type: trait, value: 0 }
+  if arr.length != 8
+    (TRAIT_DICT.values - arr.map { |x| x[:trait_type] }).each do |trait|
+      arr << { trait_type: trait, value: "Nothing" }
     end
   end
 
   hsh = {
     description: "This Panda was wrapped using the Wrapped Panda contract, accessible from https://wrappedpandas.com",
-    name: "Wrapped Panda ##{line.token_id}",
+    name: line.name,
     image: "https://pandapandas.s3.us-west-2.amazonaws.com/images/#{line.token_id}.png",
     external_url: "https://wrappedpandas.com",
     attributes: arr,
