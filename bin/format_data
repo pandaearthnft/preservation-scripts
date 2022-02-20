@@ -7,7 +7,7 @@ require "net/http"
 require "csv"
 
 def format_int(value, type)
-  return value unless %w(gen purity).include?(type)
+  return value.strip.split.map(&:capitalize).join(' ') unless %w(gen purity).include?(type)
   value.to_i
 end
 
@@ -26,21 +26,21 @@ TRAIT_DICT = {
 
 FANCIES = {
   "skeleton" => {
-    "Headwear" => "None",
+    "Headwear" => "Nothing",
     "Hand Item" => "Fire Ball",
-    "Clothes" => "Red Cape",
+    "Clothes" => "Mage",
     "Stance" => "Standing",
   },
   "robot" => {
-    "Headwear" => "Robot Helmet",
+    "Headwear" => "Exo Helmet",
     "Hand Item" => "Nothing",
-    "Clothes" => "Robot Suit",
+    "Clothes" => "Exoskeleton",
     "Stance" => "Standing",
   },
   "bride" => {
     "Headwear" => "Bridal Hat",
     "Hand Item" => "Nothing",
-    "Clothes" => "Bridal Dress",
+    "Clothes" => "Bridal Gown",
     "Stance" => "Standing",
   }
 }
@@ -57,7 +57,7 @@ File.open('./os-metadata.ndjson').each_line.map do |l|
   end
 
   line.traits.each do |hsh|
-    arr << { trait_type: TRAIT_DICT[hsh.trait_type.downcase], value: format_int(hsh.value, hsh.trait_type) }
+    arr << { trait_type: TRAIT_DICT[hsh.trait_type.downcase].strip.split.map(&:capitalize).join(' '), value: format_int(hsh.value, hsh.trait_type) }
   end
 
   if File.extname(line.image_original_url.to_s) == ".svg"
@@ -77,8 +77,9 @@ File.open('./os-metadata.ndjson').each_line.map do |l|
       if File.exist?("csvs/#{type}.csv")
         value = CSV.read("csvs/#{type}.csv", headers: true).find { |x| x["Trait Number"] == value.to_s }["Human Readable Name"]
       end
+      next if value == "Nothing"
 
-      arr << { trait_type: type, value: value }
+      arr << { trait_type: type.strip.split.map(&:capitalize).join(' '), value: value.strip.split.map(&:capitalize).join(' ') }
     end
   else
     fancy_type = arr.select { |x| x[:trait_type] == "Type" }[0][:value]
@@ -90,7 +91,8 @@ File.open('./os-metadata.ndjson').each_line.map do |l|
         else
           trait_hsh[trait][fancy_type] = trait_hsh[trait].size
         end
-        FANCIES.fetch(fancy_type, {}).fetch(trait, "guardian")
+
+        FANCIES.fetch(fancy_type.downcase, {}).fetch(trait, "guardian")
       else
         if trait_hsh[trait][fancy_type]
           trait_hsh[trait][fancy_type]
@@ -98,21 +100,20 @@ File.open('./os-metadata.ndjson').each_line.map do |l|
           trait_hsh[trait][fancy_type] = trait_hsh[trait].size
         end
       end
-      arr << { trait_type: trait, value: value }
+      next if value == "Nothing"
+
+      arr << { trait_type: trait.strip.split.map(&:capitalize).join(' '), value: value.strip.split.map(&:capitalize).join(' ') }
     end
   end
 
-  if arr.length != 8
-    (TRAIT_DICT.values - arr.map { |x| x[:trait_type] }).each do |trait|
-      arr << { trait_type: trait, value: "Nothing" }
-    end
-  end
+  # Ignore guardians
+  next if line.token_id.to_i < 51
 
   hsh = {
-    description: "This Panda was wrapped using the Wrapped Panda contract, accessible from https://wrappedpandas.com",
-    name: line.name,
-    image: "https://pandapandas.s3.us-west-2.amazonaws.com/images/#{line.token_id}.png",
-    external_url: "https://wrappedpandas.com",
+    description: "Wrapped Panda Earth token. Learn more at https://pandaearthnft.com",
+    name: "Panda ##{line.token_id}",
+    image: "https://raw.githubusercontent.com/pandaearthnft/preservation-scripts/main/images/#{line.token_id}.png",
+    external_url: "https://pandaearthnft.com",
     attributes: arr,
     id: line.token_id.to_i
   }
